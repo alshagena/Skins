@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Golf Skins Calculator</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    input[type='number'], input[type='text'] { width: 60px; }
+    .name-input { width: 100px; }
+    button { padding: 10px 15px; margin-top: 10px; }
+    .hole-winner { font-weight: bold; margin: 4px 0; }
+  </style>
+</head>
+<body>
+
+<h2>Golf Skins Calculator</h2>
+
+<label>Number of Players: <input type="number" id="numPlayers" value="4" min="2" max="10"></label><br><br>
+<label>Skins Value ($): <input type="number" id="skinValue" value="5" min="0"></label><br><br>
+<label><input type="radio" name="holeMode" value="9" checked> 9 Holes</label>
+<label><input type="radio" name="holeMode" value="18"> 18 Holes</label><br><br>
+
+<button onclick="generateScorecard()">Create Scorecard</button>
+
+<div id="scorecardArea"></div>
+<div id="resultsArea"></div>
+
+<script>
+function generateScorecard() {
+  const numPlayers = parseInt(document.getElementById('numPlayers').value);
+  const holeCount = parseInt(document.querySelector('input[name="holeMode"]:checked').value);
+  const scorecardArea = document.getElementById('scorecardArea');
+  scorecardArea.innerHTML = '';
+
+  let html = `<table><tr><th>Hole</th>`;
+  for (let i = 1; i <= numPlayers; i++) {
+    html += `<th>
+      Name<br><input type="text" id="name${i}" class="name-input" placeholder="Player ${i}">
+      <br>HCP<br><input type="number" id="hcp${i}" placeholder="0" min="0">
+    </th>`;
+  }
+  html += `</tr>`;
+
+  for (let hole = 1; hole <= holeCount; hole++) {
+    html += `<tr><td>${hole}</td>`;
+    for (let p = 1; p <= numPlayers; p++) {
+      html += `<td><input type="number" id="p${p}h${hole}" min="1" required></td>`;
+    }
+    html += `</tr>`;
+  }
+
+  html += `</table><button onclick="calculateSkins()">Calculate Skins</button>`;
+  scorecardArea.innerHTML = html;
+}
+
+function calculateSkins() {
+  const numPlayers = parseInt(document.getElementById('numPlayers').value);
+  const holeCount = parseInt(document.querySelector('input[name="holeMode"]:checked').value);
+  const skinValue = parseFloat(document.getElementById('skinValue').value);
+  const names = [];
+  const handicaps = [];
+  const skinsWon = Array(numPlayers).fill(0);
+  const holeWinners = [];
+
+  for (let i = 1; i <= numPlayers; i++) {
+    let name = document.getElementById(`name${i}`).value.trim();
+    if (!name) name = `Player ${i}`;
+    names.push(name);
+    handicaps.push(parseInt(document.getElementById(`hcp${i}`).value) || 0);
+  }
+
+  for (let hole = 1; hole <= holeCount; hole++) {
+    let scores = [];
+    for (let p = 1; p <= numPlayers; p++) {
+      let raw = parseInt(document.getElementById(`p${p}h${hole}`).value);
+      if (isNaN(raw)) {
+        alert(`Missing score for ${names[p - 1]} on Hole ${hole}`);
+        return;
+      }
+      let net = raw - Math.floor(handicaps[p - 1] / holeCount);
+      scores.push({ player: p - 1, net });
+    }
+
+    const min = Math.min(...scores.map(s => s.net));
+    const winners = scores.filter(s => s.net === min);
+
+    if (winners.length === 1) {
+      const winnerIndex = winners[0].player;
+      skinsWon[winnerIndex]++;
+      holeWinners.push(`Hole ${hole}: ${names[winnerIndex]} wins`);
+    } else {
+      holeWinners.push(`Hole ${hole}: Push`);
+    }
+  }
+
+  let resultHTML = `<h3>Results</h3><table><tr><th>Player</th><th>Skins</th><th>Winnings ($)</th></tr>`;
+  for (let i = 0; i < numPlayers; i++) {
+    const payout = skinsWon[i] * skinValue;
+    resultHTML += `<tr><td>${names[i]}</td><td>${skinsWon[i]}</td><td>$${payout.toFixed(2)}</td></tr>`;
+  }
+  resultHTML += `</table>`;
+
+  resultHTML += `<h3>Hole-by-Hole Results</h3>`;
+  resultHTML += holeWinners.map(line => `<div class="hole-winner">${line}</div>`).join("");
+
+  document.getElementById('resultsArea').innerHTML = resultHTML;
+}
+</script>
+
+</body>
+</html>
