@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Golf Skins Calculator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 10px;
+      color: #333;
+    }
+    h2 {
+      text-align: center;
+      font-size: 1.5rem;
+    }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: white;
+      padding: 15px;
+      margin-top: 10px;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    label {
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      font-size: 0.95rem;
+    }
+    input[type="number"], input[type="text"] {
+      font-size: 1rem;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin-top: 4px;
+    }
+    button {
+      font-size: 1rem;
+      font-weight: bold;
+      padding: 12px;
+      background-color: #007bff;
+      border: none;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    th, td {
+      padding: 6px;
+      font-size: 0.85rem;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f2f5;
+      font-weight: 600;
+    }
+    .scorecard-wrapper {
+      overflow-x: auto;
+    }
+    .hole-winner {
+      font-weight: 500;
+      padding: 4px 0;
+      font-size: 0.95rem;
+    }
+    #resultsArea {
+      background: white;
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+<body>
+
+<h2>Golf Skins Calculator</h2>
+
+<div class="controls">
+  <label>Number of Players:
+    <input type="number" id="numPlayers" value="4" min="2" max="10">
+  </label>
+  <label>Skins Value ($):
+    <input type="number" id="skinValue" value="5" min="0">
+  </label>
+  <label>Hole Count:
+    <div>
+      <label><input type="radio" name="holeMode" value="9" checked> 9 Holes</label>
+      <label><input type="radio" name="holeMode" value="18"> 18 Holes</label>
+    </div>
+  </label>
+  <button onclick="generateScorecard()">Create Scorecard</button>
+  <button onclick="loadGame()">📂 Load Last Game</button>
+</div>
+
+<div id="scorecardArea"></div>
+<div id="resultsArea"></div>
+
+<script>
+function generateScorecard(data = null) {
+  const numPlayers = data ? data.numPlayers : parseInt(document.getElementById('numPlayers').value);
+  const holeCount = data ? data.holeCount : parseInt(document.querySelector('input[name="holeMode"]:checked').value);
+  const scorecardArea = document.getElementById('scorecardArea');
+  document.getElementById('numPlayers').value = numPlayers;
+  document.querySelector(`input[name="holeMode"][value="${holeCount}"]`).checked = true;
+  scorecardArea.innerHTML = '';
+
+  let html = `<div class="scorecard-wrapper"><table><tr><th>Hole</th>`;
+  for (let i = 1; i <= numPlayers; i++) {
+    html += `<th>
+      <input type="text" id="name${i}" placeholder="P${i}" style="width: 80px;"><br>
+      <input type="number" id="hcp${i}" placeholder="HCP" style="width: 60px;">
+    </th>`;
+  }
+  html += `</tr>`;
+
+  html += `<tr><td>Hdcp</td>`;
+  for (let i = 1; i <= numPlayers; i++) html += `<td></td>`;
+  html += `</tr>`;
+
+  for (let hole = 1; hole <= holeCount; hole++) {
+    html += `<tr><td>${hole}<br><input type="number" id="holeHcp${hole}" min="1" max="18" style="width: 50px;" placeholder="Hdcp"></td>`;
+    for (let p = 1; p <= numPlayers; p++) {
+      html += `<td><input type="number" id="p${p}h${hole}" min="1" style="width: 60px;"></td>`;
+    }
+    html += `</tr>`;
+  }
+
+  html += `</table></div>
+    <button onclick="calculateSkins()">Calculate Skins</button>
+    <button onclick="saveGame()">💾 Save Game</button>`;
+  scorecardArea.innerHTML = html;
+
+  if (data) {
+    document.getElementById('skinValue').value = data.skinValue;
+    for (let i = 1; i <= numPlayers; i++) {
+      document.getElementById(`name${i}`).value = data.names[i - 1];
+      document.getElementById(`hcp${i}`).value = data.handicaps[i - 1];
+    }
+    for (let hole = 1; hole <= holeCount; hole++) {
+      if (data.holeHandicaps) {
+        document.getElementById(`holeHcp${hole}`).value = data.holeHandicaps[hole - 1];
+      }
+      for (let p = 1; p <= numPlayers; p++) {
+        const score = data.scores[`p${p}h${hole}`];
+        if (score !== undefined) {
+          document.getElementById(`p${p}h${hole}`).value = score;
+        }
+      }
+    }
+  }
+}
+
+function calculateSkins() {
+  const numPlayers = parseInt(document.getElementById('numPlayers').value);
+  const holeCount = parseInt(document.querySelector('input[name="holeMode"]:checked').value);
+  const skinValue = parseFloat(document.getElementById('skinValue').value);
+  const names = [], handicaps = [], skinsWon = Array(numPlayers).fill(0);
+  const netScoresTable = Array(numPlayers).fill(0).map(() => []);
+  const holeWinners = [];
+
+  for (let i = 1; i <= numPlayers; i++) {
+    let name = document.getElementById(`name${i}`).value.trim();
+    if (!name) name = `Player ${i}`;
+    names.push(name);
+    handicaps.push(parseInt(document.getElementById(`hcp${i}`).value) || 0);
+  }
+
+  for (let hole = 1; hole <= holeCount; hole++) {
+    let scores = [];
+    const holeHcp = parseInt(document.getElementById(`holeHcp${hole}`).value) || 18;
+
+    for (let p = 1; p <= numPlayers; p++) {
+      let raw = parseInt(document.getElementById(`p${p}h${hole}`).value);
+      if (isNaN(raw)) {
+        alert(`Missing score for ${names[p - 1]} on Hole ${hole}`);
+        return;
+      }
+
+      const playerHcp = handicaps[p - 1];
+      let strokes = 0;
+      if (playerHcp >= holeHcp) strokes++;
+      if (playerHcp >= holeHcp + 18) strokes++;
+      let net = raw - strokes;
+
+      netScoresTable[p - 1].push(net);
+      scores.push({ player: p - 1, net });
+    }
+
+    const min = Math.min(...scores.map(s => s.net));
+    const winners = scores.filter(s => s.net === min);
+
+    if (winners.length === 1) {
+      const winnerIndex = winners[0].player;
+      skinsWon[winnerIndex]++;
+      holeWinners.push(`Hole ${hole}: ${names[winnerIndex]} wins`);
+    } else {
+      holeWinners.push(`Hole ${hole}: Push`);
+    }
+  }
+
+  // Total skins actually paid
+  const totalSkins = skinsWon.reduce((a, b) => a + b, 0);
+  const totalPot = totalSkins * skinValue;
+
+  let resultHTML = `<h3>Results</h3><table><tr><th>Player</th><th>Skins Won</th><th>Winnings ($)</th></tr>`;
+  for (let i = 0; i < numPlayers; i++) {
+    const payout = skinsWon[i] * skinValue;
+    resultHTML += `<tr><td>${names[i]}</td><td>${skinsWon[i]}</td><td>$${payout.toFixed(2)}</td></tr>`;
+  }
+  resultHTML += `</table><p><strong>Total Pot Paid:</strong> $${totalPot.toFixed(2)}</p>`;
+
+  // Hole-by-hole results
+  resultHTML += `<h3>Hole-by-Hole Winners</h3>`;
+  resultHTML += holeWinners.map(w => `<div class="hole-winner">${w}</div>`).join("");
+
+  // Net strokes table
+  resultHTML += `<h3>Net Strokes Per Hole</h3><div class="scorecard-wrapper"><table><tr><th>Hole</th>`;
+  for (let i = 0; i < numPlayers; i++) {
+    resultHTML += `<th>${names[i]}</th>`;
+  }
+  resultHTML += `</tr>`;
+
+  for (let hole = 0; hole < holeCount; hole++) {
+    resultHTML += `<tr><td>${hole + 1}</td>`;
+    for (let p = 0; p < numPlayers; p++) {
+      resultHTML += `<td>${netScoresTable[p][hole]}</td>`;
+    }
+    resultHTML += `</tr>`;
+  }
+  resultHTML += `</table></div>`;
+
+  document.getElementById('resultsArea').innerHTML = resultHTML;
+}
+
+
+
+
+function saveGame() {
+  const numPlayers = parseInt(document.getElementById('numPlayers').value);
+  const holeCount = parseInt(document.querySelector('input[name="holeMode"]:checked').value);
+  const skinValue = parseFloat(document.getElementById('skinValue').value);
+  const names = [], handicaps = [], scores = [], holeHandicaps = [];
+
+  for (let i = 1; i <= numPlayers; i++) {
+    names.push(document.getElementById(`name${i}`).value);
+    handicaps.push(document.getElementById(`hcp${i}`).value);
+  }
+
+  for (let hole = 1; hole <= holeCount; hole++) {
+    holeHandicaps.push(document.getElementById(`holeHcp${hole}`).value || "18");
+    for (let p = 1; p <= numPlayers; p++) {
+      scores[`p${p}h${hole}`] = document.getElementById(`p${p}h${hole}`).value;
+    }
+  }
+
+  const gameData = { numPlayers, holeCount, skinValue, names, handicaps, scores, holeHandicaps };
+  localStorage.setItem('golfSkinsGame', JSON.stringify(gameData));
+  alert("Game saved successfully!");
+}
+
+function loadGame() {
+  const saved = localStorage.getItem('golfSkinsGame');
+  if (!saved) {
+    alert("No saved game found.");
+    return;
+  }
+  const data = JSON.parse(saved);
+  generateScorecard(data);
+}
+</script>
+
+</body>
+</html>
